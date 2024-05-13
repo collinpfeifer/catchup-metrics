@@ -1,6 +1,5 @@
 import streamlit as st
 import logging
-from datetime import datetime, timedelta
 import os
 import pandas as pd
 import psycopg2
@@ -26,10 +25,7 @@ def get_answers(conn):
         conn.commit()
         rows.sort(key=lambda x: x["createdAt"])
         return rows
-
-
-# get the total number of users each day and the total number of answers each day
-
+    
 
 def format_date(date):
     formatted_date = date.strftime("%Y-%m-%d")
@@ -60,37 +56,26 @@ def get_users_per_day_vs_answers_per_day(users, answers):
 
 def main():
     try:
-        # Attempt to connect to cluster with connection string provided to
-        # script. By default, this script uses the value saved to the
-        # DATABASE_URL environment variable.
-        # For information on supported connection string formats, see
-        # https://www.cockroachlabs.com/docs/stable/connect-to-the-database.html.
-
         conn = psycopg2.connect(
             os.environ["DATABASE_URL"],
             application_name="$ docs_simplecrud_psycopg2",
             cursor_factory=psycopg2.extras.RealDictCursor,
         )
-        users = get_users(conn)
-        answers = get_answers(conn)
         users_per_day, answers_per_day = get_users_per_day_vs_answers_per_day(
-            users, answers
+            get_users(conn), get_answers(conn)
         )
         # Create DataFrames from dictionaries
         users_df = pd.DataFrame(users_per_day.items(), columns=["Date", "Users"])
         answers_df = pd.DataFrame(answers_per_day.items(), columns=["Date", "Answers"])
-
         # Merge DataFrames on 'Date' column
         merged_df = pd.merge(users_df, answers_df, on="Date", how="outer")
-
-        # Fill NaN values with 0
-        merged_df.fillna(0, inplace=True)
-
+        merged_df["Date"] = pd.to_datetime(merged_df["Date"])
+        merged_df["Users"] = merged_df["Users"].ffill()
+        merged_df["Answers"] = merged_df["Answers"].fillna(0)
         # Set 'Date' column as index
-        merged_df.set_index("Date", inplace=True)
 
         st.write("""# Catch-Up Users VS Answers per Day""")
-        st.line_chart(merged_df)
+        st.line_chart(merged_df, x="Date")
     except Exception as e:
         logging.fatal("database connection failed")
         logging.fatal(e)
