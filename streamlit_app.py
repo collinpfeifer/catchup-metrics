@@ -25,7 +25,7 @@ def get_answers(conn):
         conn.commit()
         rows.sort(key=lambda x: x["createdAt"])
         return rows
-    
+
 
 def format_date(date):
     formatted_date = date.strftime("%Y-%m-%d")
@@ -57,7 +57,11 @@ def get_users_per_day_vs_answers_per_day(users, answers):
 def main():
     try:
         conn = psycopg2.connect(
-            os.environ["DATABASE_URL"],
+            (
+                os.environ["DATABASE_URL"]
+                if "DATABASE_URL" in os.environ
+                else st.secrets["DATABASE_URL"]
+            ),
             application_name="$ docs_simplecrud_psycopg2",
             cursor_factory=psycopg2.extras.RealDictCursor,
         )
